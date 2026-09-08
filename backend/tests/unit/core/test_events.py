@@ -195,6 +195,59 @@ class TestSTFFT:
                 signal_size, window_size, window_hop
             )
 
+    @pytest.mark.parametrize(
+        ("window_size", "window_hop", "expected"),
+        [
+            # Even window size, even hop. Hop greater than size.
+            (4, 6, 1),
+            # Even window size, even hop. Hop equals size.
+            (4, 4, 1),
+            # Even window size even hop. Hop half of size.
+            (4, 2, 1),
+            # Even window size, odd hop. Hop quater of size.
+            (4, 1, 2),
+            # Odd window size, odd hop. Hop equals size.
+            (5, 5, 1),
+            # Odd window size, even hop. Hop less than size.
+            (5, 3, 1),
+            # Odd window size, even hop. Hop less than size.
+            (5, 2, 1),
+            # Smallest possible window.
+            (1, 1, 0),
+            # Small window.
+            (2, 1, 1),
+            (2, 2, 1),
+        ],
+    )
+    def test_num_dangling_windows(
+        self,
+        window_size: int,
+        window_hop: int,
+        expected: int,
+    ) -> None:
+        """Check that we compute the right number of dangling windows."""
+        assert expected == spectre_server.core.events.get_num_dangling_windows(
+            window_size, window_hop
+        )
+
+    @pytest.mark.parametrize(
+        ("window_size", "window_hop"),
+        [
+            # The window size cannot be less than one.
+            (0, 4),
+            # The window hop cannot be less than one.
+            (4, 0),
+        ],
+    )
+    def test_invalid_num_dangling_windows(
+        self,
+        window_size: int,
+        window_hop: int,
+    ) -> None:
+        """Check that passing bad arguments yields a ValueError in various cases."""
+        with pytest.raises(ValueError):
+            spectre_server.core.events.get_num_dangling_windows(window_size, window_hop)
+
     def test_stfft(self) -> None:
         """Check that the stfft of a simple cosine wave matches the analytically derived solution."""
         # Define the cosine wave.

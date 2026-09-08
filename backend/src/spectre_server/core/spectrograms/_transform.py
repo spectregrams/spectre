@@ -3,12 +3,18 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import datetime
-import math
 
 import numpy as np
 
-from ._array_operations import find_closest_index, moving_average, time_elapsed
+from ._array_operations import (
+    find_closest_index,
+    moving_average,
+    time_elapsed,
+    get_moving_average_window_size,
+)
 from ._spectrogram import Spectrogram
+
+# TODO: Reconsider ownership of NumPy arrays on transforms. Currently, callers may find that mutating some arrays in transformed spectrograms corrupts the original.
 
 
 def frequency_chop(
@@ -149,7 +155,10 @@ def time_average(spectrogram: Spectrogram, resolution: float) -> Spectrogram:
             f"Desired time resolution {resolution} must be less than the time range {spectrogram.time_range}"
         )
 
-    window_size = math.floor(resolution / spectrogram.time_resolution)
+    window_size = get_moving_average_window_size(
+        resolution, spectrogram.time_resolution
+    )
+
     transformed_dynamic_spectra = moving_average(
         spectrogram.dynamic_spectra, window_size, axis=1
     )
@@ -186,7 +195,10 @@ def frequency_average(spectrogram: Spectrogram, resolution: float) -> Spectrogra
             f"Desired frequency resolution {resolution} must be less than the frequency range {spectrogram.time_range}"
         )
 
-    window_size = math.floor(resolution / spectrogram.frequency_resolution)
+    window_size = get_moving_average_window_size(
+        resolution, spectrogram.frequency_resolution
+    )
+
     transformed_dynamic_spectra = moving_average(
         spectrogram.dynamic_spectra, window_size, axis=0
     )
@@ -198,6 +210,40 @@ def frequency_average(spectrogram: Spectrogram, resolution: float) -> Spectrogra
         transformed_dynamic_spectra,
         spectrogram.times,
         transformed_frequencies,
+        spectrogram.spectrum_unit,
+        start_datetime=(
+            spectrogram.start_datetime if spectrogram.start_datetime_is_set else None
+        ),
+    )
+
+
+def ignore_leading_spectrums(spectrogram: Spectrogram, n: int) -> Spectrogram:
+    """Mark the first ``n`` spectrums as NaN.
+
+    :param spectrogram: The input spectrogram.
+    :param n: The number of leading spectrums to mark as NaN.
+    :raises ValueError: If ``n`` is negative or greater than the number of spectrums.
+    :return: A new spectrogram with the first ``n`` spectrums NaN'd.
+    """
+    if n < 0:
+        raise ValueError(f"n must be non-negative. Got {n}.")
+
+    if n > spectrogram.num_times:
+        raise ValueError(
+            f"n must be less than the number of spectrums ({spectrogram.num_times}). Got {n}."
+        )
+
+    # Nothing to do.
+    if n == 0:
+        return spectrogram
+
+    transformed_dynamic_spectra = spectrogram.dynamic_spectra.copy()
+    transformed_dynamic_spectra[:, :n] = np.nan
+
+    return Spectrogram(
+        transformed_dynamic_spectra,
+        spectrogram.times,
+        spectrogram.frequencies,
         spectrogram.spectrum_unit,
         start_datetime=(
             spectrogram.start_datetime if spectrogram.start_datetime_is_set else None

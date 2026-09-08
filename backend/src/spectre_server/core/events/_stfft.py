@@ -2,6 +2,8 @@
 # This file is part of SPECTRE
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import math
+
 import numpy as np
 import numpy.typing as npt
 import pyfftw
@@ -150,6 +152,25 @@ def get_num_spectrums(signal_size: int, window_size: int, window_hop: int) -> in
         )
 
     return int((signal_size - np.ceil(window_size / 2)) / window_hop) + 1
+
+
+def get_num_dangling_windows(window_size: int, window_hop: int) -> int:
+    """Compute how many leading windows dangle out of the signal.
+
+    Assumes the first window is centered at the start of the signal (index 0).
+
+    :param window_size: The number of samples in each window.
+    :param window_hop: The number of samples the window advances per frame.
+    :return: The number of leading windows that would dangle outside the signal,
+    applying ``stfft`` with this ``window_size`` and ``window_hop``.
+    """
+    if window_hop < 1:
+        raise ValueError(f"The window hop must be at least one. " f"Got {window_hop}.")
+
+    if window_size < 1:
+        raise ValueError(f"The window size must be at least one. Got {window_size}")
+
+    return math.ceil((window_size // 2) / window_hop)
 
 
 def stfft(

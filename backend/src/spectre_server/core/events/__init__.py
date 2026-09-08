@@ -18,6 +18,7 @@ from ._stfft import (
     get_times,
     get_cosine_signal,
     get_num_spectrums,
+    get_num_dangling_windows,
 )
 
 __all__ = [
@@ -35,5 +36,6 @@ __all__ = [
     "get_times",
     "get_frequencies",
     "get_num_spectrums",
+    "get_num_dangling_windows",
     "get_cosine_signal",
 ]

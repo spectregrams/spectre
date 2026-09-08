@@ -197,6 +197,108 @@ class TestFrequencyAverage:
         assert np.allclose(averaged_s.times, spectrogram.times)
 
 
+class TestMovingAverage:
+    @pytest.mark.parametrize(
+        ("current", "target", "expected"),
+        [
+            (0.25, 0.5, 2),
+            (0.25, 0.25, 1),
+            (0.25, 0.1, 1),
+            (0.25, 0.33, 1),
+            (0.25, 0.75, 3),
+        ],
+    )
+    def test_get_moving_average_window_size(
+        self, current: float, target: float, expected: int
+    ) -> None:
+        """Make sure we properly compute the size of the window in the moving average to achieve some target resolution."""
+        assert (
+            spectre_server.core.spectrograms.get_moving_average_window_size(
+                target, current
+            )
+            == expected
+        )
+
+    def test_negative_resolution_raises(self) -> None:
+        """Check that trying to determine the moving average window size with negative resolutions raises"""
+        with pytest.raises(ValueError, match="negative resolutions"):
+            spectre_server.core.spectrograms.get_moving_average_window_size(-1, -1)
+
+
+class TestIgnoreNLeading:
+    def test_zero_returns_unchanged(
+        self,
+        spectrogram: spectre_server.core.spectrograms.Spectrogram,
+    ) -> None:
+        """Check that n=0 yields an identical dynamic spectra, with no NaNs introduced."""
+        transformed_s = spectre_server.core.spectrograms.ignore_leading_spectrums(
+            spectrogram, 0
+        )
+        assert np.array_equal(
+            transformed_s.dynamic_spectra, spectrogram.dynamic_spectra
+        )
+        assert not np.any(np.isnan(transformed_s.dynamic_spectra))
+
+        # Other metadata is unchanged.
+        assert np.array_equal(transformed_s.times, spectrogram.times)
+        assert np.array_equal(transformed_s.frequencies, spectrogram.frequencies)
+        assert transformed_s.spectrum_unit == spectrogram.spectrum_unit
+        assert transformed_s.start_datetime_is_set == spectrogram.start_datetime_is_set
+
+    def test_nan_leading(
+        self,
+        spectrogram: spectre_server.core.spectrograms.Spectrogram,
+    ) -> None:
+        """Check that n=2 NaNs the first two columns, leaving the rest (and metadata) unchanged."""
+        transformed_s = spectre_server.core.spectrograms.ignore_leading_spectrums(
+            spectrogram, 2
+        )
+        assert np.all(np.isnan(transformed_s.dynamic_spectra[:, :2]))
+        assert np.array_equal(
+            transformed_s.dynamic_spectra[:, 2:], spectrogram.dynamic_spectra[:, 2:]
+        )
+
+        # Other metadata is unchanged.
+        assert np.array_equal(transformed_s.times, spectrogram.times)
+        assert np.array_equal(transformed_s.frequencies, spectrogram.frequencies)
+        assert transformed_s.spectrum_unit == spectrogram.spectrum_unit
+        assert transformed_s.start_datetime_is_set == spectrogram.start_datetime_is_set
+
+    def test_negative_n_raises(
+        self,
+        spectrogram: spectre_server.core.spectrograms.Spectrogram,
+    ) -> None:
+        """Check that a negative n raises a ValueError."""
+        with pytest.raises(ValueError):
+            spectre_server.core.spectrograms.ignore_leading_spectrums(spectrogram, -1)
+
+    @pytest.mark.parametrize("n", [7, 8])
+    def test_n_exceeds_num_spectrums_raises(
+        self,
+        spectrogram: spectre_server.core.spectrograms.Spectrogram,
+        n: int,
+    ) -> None:
+        """Check that n equal to or greater than the spectrum count raises a ValueError."""
+        with pytest.raises(ValueError):
+            spectre_server.core.spectrograms.ignore_leading_spectrums(spectrogram, n)
+
+    def test_composes_with_time_average(
+        self,
+        spectrogram: spectre_server.core.spectrograms.Spectrogram,
+    ) -> None:
+        """Check that a NaN'd leading spectrum is excluded from a subsequent time average."""
+        transformed_s = spectre_server.core.spectrograms.ignore_leading_spectrums(
+            spectrogram, 1
+        )
+        averaged_s = spectre_server.core.spectrograms.time_average(transformed_s, 0.4)
+        # The first spectrum is excluded from averaging, so the first spectrum in the averaged
+        # spectrogram assumes the value of the second spectrum in the original.
+        assert np.allclose(
+            averaged_s.dynamic_spectra[:, 0], spectrogram.dynamic_spectra[:, 1]
+        )
+        assert not np.any(np.isnan(averaged_s.dynamic_spectra))
+
+
 class TestSpectrogram:
     def test_start_datetime_setter(
         self, spectrogram: spectre_server.core.spectrograms.Spectrogram

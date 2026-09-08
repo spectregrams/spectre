@@ -3,9 +3,25 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import typing
+import math
 
 import numpy as np
 import numpy.typing as npt
+
+
+def get_moving_average_window_size(target: float, current: float) -> int:
+    """Get the moving average window size required to achieve the ``target`` resolution through
+    a moving average, based on ``current``."""
+    if target < 0 or current < 0:
+        raise ValueError(
+            f"Cannot determine moving average window size for negative resolutions"
+        )
+
+    # The target is not possible, current is best.
+    if target <= current:
+        return 1
+
+    return math.floor(target / current)
 
 
 def moving_average(

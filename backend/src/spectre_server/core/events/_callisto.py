@@ -17,6 +17,7 @@ from ._stfft import (
     get_window,
     get_times,
     get_num_spectrums,
+    get_num_dangling_windows,
     get_frequencies,
     get_fftw_obj,
     stfft,
@@ -135,8 +136,28 @@ class Callisto(Base[CallistoModel, spectre_server.core.batches.CallistoBatch]):
             batch.start_datetime,
         )
 
+        target_time_resolution = max(
+            self.__model.time_resolution, spectrogram.time_resolution
+        )
+
+        # Only ignore leading spectrums if they will be averaged away. We don't want NaN values in the final spectrogram.
+        num_dangling_windows = get_num_dangling_windows(
+            self.__model.window_size, self.__model.window_hop
+        )
+        moving_average_window_size = (
+            spectre_server.core.spectrograms.get_moving_average_window_size(
+                target_time_resolution, spectrogram.time_resolution
+            )
+        )
+        will_average = moving_average_window_size > 1
+        nans_averaged_away = num_dangling_windows < moving_average_window_size
+        if will_average and nans_averaged_away:
+            spectrogram = spectre_server.core.spectrograms.ignore_leading_spectrums(
+                spectrogram, num_dangling_windows
+            )
+
         spectrogram = spectre_server.core.spectrograms.time_average(
-            spectrogram, max(self.__model.time_resolution, spectrogram.time_resolution)
+            spectrogram, target_time_resolution
         )
         spectrogram = spectre_server.core.spectrograms.frequency_average(
             spectrogram,
