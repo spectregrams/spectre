@@ -81,19 +81,17 @@ class TestTimeAverage:
                 ],
                 [0, 0.4, 0.8],
             ),
-            # Impossible resolution, moving average divides 6 spectra into 1 full window, 1 partial.
+            # Exact resolution, moving average divides 6 spectra into 2 full windows.
             pytest.param(
-                0.85,
-                0.8,
-                [[1.5, 4.5], [7.5, 10.5], [13.5, 16.5], [19.5, 22.5]],
-                [0, 0.8],
-            ),
-            # Exact resolution, moving average divides 6 spectra into 1 full window, 1 partial.
-            pytest.param(
-                0.8,
-                0.8,
-                [[1.5, 4.5], [7.5, 10.5], [13.5, 16.5], [19.5, 22.5]],
-                [0, 0.8],
+                0.65,
+                0.6,
+                [
+                    [1, 4],
+                    [7, 10],
+                    [13, 16],
+                    [19, 22],
+                ],
+                [0, 0.6],
             ),
         ],
     )
@@ -116,6 +114,23 @@ class TestTimeAverage:
         )
         assert np.allclose(averaged_s.times, np.array(expected_times, dtype=np.float32))
         assert np.allclose(averaged_s.frequencies, spectrogram.frequencies)
+
+    def test_averaging_trims_partial_window(self) -> None:
+        """Check the trailing partial window is discarded."""
+        # 7 times at 0.1 s, window=3 yields 2 full windows with 1 trailing sample dropped.
+        dynamic_spectra = np.arange(14, dtype=np.float32).reshape(2, 7)
+        times = np.linspace(0.0, 0.6, 7, dtype=np.float32)
+        frequencies = np.array([1e6, 2e6], dtype=np.float32)
+        spectrogram = spectre_server.core.spectrograms.Spectrogram(
+            dynamic_spectra,
+            times,
+            frequencies,
+            spectre_server.core.spectrograms.SpectrumUnit.AMPLITUDE,
+        )
+        averaged_s = spectre_server.core.spectrograms.time_average(spectrogram, 0.35)
+        assert averaged_s.dynamic_spectra.shape == (2, 2)
+        assert np.allclose(averaged_s.dynamic_spectra, [[1, 4], [8, 11]])
+        assert np.allclose(averaged_s.times, [0.0, 0.3])
 
 
 class TestFrequencyAverage:
@@ -195,6 +210,28 @@ class TestFrequencyAverage:
             np.array(expected_frequencies, dtype=np.float32),
         )
         assert np.allclose(averaged_s.times, spectrogram.times)
+
+    def test_averaging_trims_partial_window(self) -> None:
+        """Check the trailing partial window is discarded."""
+        # 5 frequencies at 1 MHz, window=2 yields 2 full windows with 1 trailing bin dropped.
+        dynamic_spectra = np.arange(15, dtype=np.float32).reshape(5, 3)
+        times = np.array([0.0, 0.2, 0.4], dtype=np.float32)
+        frequencies = np.array([1e6, 2e6, 3e6, 4e6, 5e6], dtype=np.float32)
+        spectrogram = spectre_server.core.spectrograms.Spectrogram(
+            dynamic_spectra,
+            times,
+            frequencies,
+            spectre_server.core.spectrograms.SpectrumUnit.AMPLITUDE,
+        )
+        averaged_s = spectre_server.core.spectrograms.frequency_average(
+            spectrogram, 2e6
+        )
+        assert averaged_s.dynamic_spectra.shape == (2, 3)
+        assert np.allclose(
+            averaged_s.dynamic_spectra,
+            [[1.5, 2.5, 3.5], [7.5, 8.5, 9.5]],
+        )
+        assert np.allclose(averaged_s.frequencies, [1.5e6, 3.5e6])
 
 
 class TestSpectrogram:

@@ -2,6 +2,8 @@
 # This file is part of SPECTRE
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import typing
+
 import numpy as np
 import numpy.typing as npt
 import pyfftw
@@ -152,12 +154,24 @@ def get_num_spectrums(signal_size: int, window_size: int, window_hop: int) -> in
     return int((signal_size - np.ceil(window_size / 2)) / window_hop) + 1
 
 
+def get_num_dangling_samples(window_size: int) -> int:
+    """Compute the number of samples by which the first window dangles.
+
+    By convention, the first window is centered at the start of the signal (index 0).
+
+    :param window_size: The number of samples in each window.
+    :return: The number of samples by which the first window dangles.
+    """
+    return window_size // 2
+
+
 def stfft(
     fftw_obj: pyfftw.FFTW,
     buffer: npt.NDArray[np.complex64],
     signal: npt.NDArray[np.complex64],
     window: npt.NDArray[np.float32],
     window_hop: int,
+    prepend_signal: typing.Optional[npt.NDArray[np.complex64]] = None,
 ) -> npt.NDArray[np.float32]:
     """Compute the short-time discrete Fourier transform of the input signal, using a real sliding window.
 
@@ -169,9 +183,11 @@ def stfft(
     :param signal: The input signal.
     :param window: The window function, same length as the buffer.
     :param window_hop: The number of samples the window advances per frame.
-    :param sample_rate: The sample rate of the signal.
+    :param prepend_signal: The value assumed by the signal where the window dangles. If not provided (default),
+    by convention those samples are zeroed.
     :return: a spectrogram containing the amplitude of each spectral component.
-    :raises ValueError: If the window and buffer sizes do not match.
+    :raises ValueError: If the window and buffer sizes do not match, or if `prepend_signal` is provided
+    with a length other than `window_size // 2`.
     """
     window_size = window.shape[0]
     buffer_size = buffer.shape[0]
@@ -190,6 +206,15 @@ def stfft(
     # Initialise an empty array, into which we'll copy the spectrums computed by fftw.
     dynamic_spectra = np.empty((window_size, num_spectrums), dtype=np.float32)
 
+    num_dangling_samples = get_num_dangling_samples(window_size)
+    if prepend_signal is None:
+        prepend_signal = np.zeros((num_dangling_samples,), dtype=np.complex64)
+    elif prepend_signal.shape[0] != num_dangling_samples:
+        raise ValueError(
+            f"Must provide exactly {num_dangling_samples} samples to prepend, "
+            f"got {prepend_signal.shape[0]}."
+        )
+
     for n in range(num_spectrums):
         # Center the window for the current frame
         center = window_hop * n
@@ -202,11 +227,17 @@ def stfft(
 
         # The window partially overlaps with the signal.
         else:
-            # Zero the buffer and apply the window only to valid signal samples
             signal_indices = np.arange(start, stop)
-            valid_mask = (signal_indices >= 0) & (signal_indices < signal_size)
-            buffer[:] = 0.0
-            buffer[valid_mask] = signal[signal_indices[valid_mask]] * window[valid_mask]
+
+            out_mask = signal_indices < 0
+            buffer[out_mask] = prepend_signal[
+                signal_indices[out_mask] + num_dangling_samples
+            ]
+
+            in_mask = ~out_mask
+            buffer[in_mask] = signal[signal_indices[in_mask]]
+
+            buffer *= window
 
         # Compute the DFT in-place, to produce the spectrum.
         fftw_obj.execute()

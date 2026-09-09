@@ -17,6 +17,7 @@ from ._stfft import (
     get_window,
     get_times,
     get_num_spectrums,
+    get_num_dangling_samples,
     get_frequencies,
     get_fftw_obj,
     stfft,
@@ -78,6 +79,12 @@ class Callisto(Base[CallistoModel, spectre_server.core.batches.CallistoBatch]):
         # the watchdog observer isn't set up in time before the receiver starts capturing data.
         self.__fftw_obj = None
 
+        # Cache the last samples from the previous batch so we can eliminate window effects at the start of
+        # the current one. The first batch has no previous, so (by convention) assume the samples are zero.
+        self.__prepend_signal = np.zeros(
+            get_num_dangling_samples(self.__model.window_size), dtype=np.complex64
+        )
+
     @property
     def _watch_extension(self) -> str:
         return self.__model.output_type
@@ -100,6 +107,7 @@ class Callisto(Base[CallistoModel, spectre_server.core.batches.CallistoBatch]):
             iq_data,
             self.__window,
             self.__model.window_hop,
+            prepend_signal=self.__prepend_signal,
         )
 
         # Compute the physical times we'll assign to each spectrum.
@@ -144,6 +152,12 @@ class Callisto(Base[CallistoModel, spectre_server.core.batches.CallistoBatch]):
         )
 
         _LOGGER.info("Spectrogram created successfully")
+
+        # Cache the tail to prepend to the next batch. Copy so the full batch
+        # isn't kept alive by the view.
+        self.__prepend_signal = iq_data[
+            -get_num_dangling_samples(self.__model.window_size) :
+        ].copy()
 
         if not self.__model.keep_signal:
             _LOGGER.info(f"Deleting the I/Q samples")

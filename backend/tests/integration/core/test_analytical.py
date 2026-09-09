@@ -69,7 +69,8 @@ def _validate_batches(
     spectre_config_paths: spectre_server.core.config.Paths,
 ) -> None:
     signal_generator.mode = config.receiver_mode
-    found_spectrograms = False
+
+    num_validated_batches = 0
     for batch in spectre_server.core.batches.Batches(
         config.tag,
         signal_generator.batch_cls,
@@ -79,7 +80,6 @@ def _validate_batches(
             continue
 
         spectrogram = batch.read_spectrogram()
-        found_spectrograms = True
         result = signal_generator.validate_analytically(
             spectrogram,
             signal_generator.model_validate(config.parameters),
@@ -87,9 +87,16 @@ def _validate_batches(
         )
         assert result["frequencies_validated"]
         assert result["times_validated"]
-        assert 0 <= result["num_invalid_spectrums"] <= 1
 
-    assert found_spectrograms
+        # The first batch should be the only one afflicted by window effects, and so (assuming the hop and size is such that
+        # only one window is dangling in the stfft) we can accept at most one invalid spectrum in that case.
+        max_invalid_spectrums = 1 if num_validated_batches == 0 else 0
+        assert 0 <= result["num_invalid_spectrums"] <= max_invalid_spectrums
+
+        num_validated_batches += 1
+
+    # Check we've validated at least one spectrogram.
+    assert num_validated_batches > 0
 
 
 @pytest.mark.parametrize(
