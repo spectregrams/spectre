@@ -154,9 +154,10 @@ def time_average(spectrogram: Spectrogram, resolution: float) -> Spectrogram:
         spectrogram.dynamic_spectra, window_size, axis=1
     )
 
-    # Assign the start time of each window to as the time of each spectrum in the new spectrogram.
-    # This preserves the time of the first spectrum before and after the transformation.
-    transformed_times = spectrogram.times[0::window_size]
+    # Take the start time of each window. ``moving_average`` drops any trailing
+    # partial window, so slice ``times`` to match.
+    num_windows = transformed_dynamic_spectra.shape[1]
+    transformed_times = spectrogram.times[: num_windows * window_size : window_size]
 
     return Spectrogram(
         transformed_dynamic_spectra,

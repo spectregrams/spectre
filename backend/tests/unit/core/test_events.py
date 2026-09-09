@@ -195,6 +195,24 @@ class TestSTFFT:
                 signal_size, window_size, window_hop
             )
 
+    @pytest.mark.parametrize(
+        ("window_size", "expected_num_dangling_samples"),
+        [
+            (1, 0),
+            (2, 1),
+            (4, 2),
+            (5, 2),
+        ],
+    )
+    def test_num_dangling_samples(
+        self, window_size: int, expected_num_dangling_samples: int
+    ) -> None:
+        """Check that we compute the number of dangling samples in the first window correctly."""
+        assert (
+            expected_num_dangling_samples
+            == spectre_server.core.events.get_num_dangling_samples(window_size)
+        )
+
     def test_stfft(self) -> None:
         """Check that the stfft of a simple cosine wave matches the analytically derived solution."""
         # Define the cosine wave.
@@ -222,9 +240,7 @@ class TestSTFFT:
             fftw_obj, buffer, signal, window, window_hop
         )
 
-        # TODO: Replace this "point-in-time" check, with something more robust and human readable.
-        # I'll go through the derivation again, and check against a runtime-computed analytical
-        # solution.
+        # The first spectrum is afflicted by window effects.
         expected_dynamic_spectra = np.array(
             [
                 [9.9999994e-01, 0.0, 0.0, 0.0],
@@ -235,6 +251,57 @@ class TestSTFFT:
                 [7.3914812e-08, 0.0, 0.0, 0.0],
                 [1.7320508e00, 0.0, 0.0, 0.0],
                 [2.0000000e00, 4.0, 4.0, 4.0],
+            ],
+            dtype=np.float32,
+        )
+
+        assert is_close(dynamic_spectra, expected_dynamic_spectra)
+
+    def test_stfft_with_prepend_signal(self) -> None:
+        """Check that the stfft of a simple cosine wave matches the analytically derived solution."""
+        # Define the cosine wave.
+        num_samples = 32
+        sample_rate = 8
+        frequency = 1
+        phase = 0
+        amplitude = 1
+
+        # Define the window.
+        window_type = spectre_server.core.fields.WindowType.BOXCAR
+        window_size = 8
+        window_hop = 4
+
+        # Make the full cosine signal, window and buffer.
+        full_signal = spectre_server.core.events.get_cosine_signal(
+            num_samples, sample_rate, frequency, amplitude, phase
+        )
+        window = spectre_server.core.events.get_window(window_type, window_size)
+        buffer = spectre_server.core.events.get_buffer(window_size)
+
+        # Split off the leading samples, and pass them in as the prepended signal.
+        num_dangling_samples = spectre_server.core.events.get_num_dangling_samples(
+            window_size
+        )
+        prepend_signal = full_signal[:num_dangling_samples]
+        signal = full_signal[num_dangling_samples:]
+
+        # Plan, then compute the STFFT.
+        fftw_obj = spectre_server.core.events.get_fftw_obj(buffer)
+        dynamic_spectra = spectre_server.core.events.stfft(
+            fftw_obj, buffer, signal, window, window_hop, prepend_signal
+        )
+
+        # No window effects, every spectrum should be identical.
+        expected_dynamic_spectra = np.array(
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [4.0, 4.0, 4.0, 4.0, 4.0, 4.0, 4.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [4.0, 4.0, 4.0, 4.0, 4.0, 4.0, 4.0],
             ],
             dtype=np.float32,
         )
