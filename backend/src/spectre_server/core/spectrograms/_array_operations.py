@@ -11,13 +11,16 @@ import numpy.typing as npt
 def moving_average(
     array: npt.NDArray[np.float32], window_size: int, axis: int = 0
 ) -> npt.NDArray[np.float32]:
-    """Applies a moving average along a specified axis by computing the arithmetic mean
-    over non-overlapping but exactly adjacent windows.
+    """Averages ``array`` along ``axis`` in non-overlapping windows of ``window_size``.
+
+    Any trailing samples that do not complete a window are discarded.
 
     :param array: Input array to be averaged.
     :param window_size: Number of items in the window.
     :param axis: Axis along which to perform the averaging, defaults to 0.
     :return: A new array, averaged along the specified axis.
+    :raises ValueError: If ``window_size`` is less than one, or greater than the
+    length of ``axis``.
     """
     if window_size < 1:
         raise ValueError(
@@ -27,36 +30,20 @@ def moving_average(
     axis_length = array.shape[axis]
     if window_size > axis_length:
         raise ValueError(
-            f"The window size ({window_size}) cannot be greater than the length of the axis ({axis})"
-            f"Got axis length {axis_length}"
+            f"The window size ({window_size}) cannot be greater than the length "
+            f"of the axis ({axis}). Got axis length {axis_length}."
         )
-
-    if window_size == 1:
-        # Nothing to do - arithmetic mean of one sample is itself.
-        return array
 
     num_windows = axis_length // window_size
-    remainder = axis_length % window_size
 
-    # Force the axis length to be a multiple of the window size, so if the last window is partial,
-    # we just average over remaining elements.
-    if remainder:
+    slicer = [slice(None)] * array.ndim
+    slicer[axis] = slice(0, num_windows * window_size)
+    trimmed = array[tuple(slicer)]
 
-        # We only need to pad the end of the axis we're averaging over.
-        width = window_size - remainder
-        pad_widths = [(0, 0) for _ in range(array.ndim)]
-        pad_widths[axis] = (0, width)
-
-        # Turn the partial window at the end into a full window.
-        array = np.pad(
-            array, pad_width=pad_widths, mode="constant", constant_values=(np.nan,)
-        )
-        num_windows += 1
-
-    new_shape = list(array.shape)
+    new_shape = list(trimmed.shape)
     new_shape[axis] = num_windows
     new_shape.insert(axis + 1, window_size)
-    return np.nanmean(array.reshape(new_shape), axis=axis + 1)
+    return np.nanmean(trimmed.reshape(new_shape), axis=axis + 1)
 
 
 T = typing.TypeVar("T", np.float32, np.datetime64)
