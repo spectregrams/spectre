@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.2.2](https://github.com/spectregrams/spectre/compare/v5.2.1...v5.2.2) (2026-09-10)
+
+
+### Bug Fixes
+
+* issue-308 Mitigate vertical streaks in spectrograms ([bcc9f99](https://github.com/spectregrams/spectre/commit/bcc9f9986a2d456c653a9ddc69c0096be40df371))
+
 ## [5.2.1](https://github.com/spectregrams/spectre/compare/v5.2.0...v5.2.1) (2026-08-31)
 
 
