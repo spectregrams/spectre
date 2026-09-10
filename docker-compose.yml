@@ -1,7 +1,7 @@
 services:
   spectre-server:
     container_name: spectre-server
-    image: spectregrams/spectre-server:5.2.1  # x-release-please-version
+    image: spectregrams/spectre-server:5.2.2  # x-release-please-version
     environment:
       - SPECTRE_GID=${SPECTRE_GID}
       - SPECTRE_BIND_HOST=${SPECTRE_BIND_HOST}
@@ -21,7 +21,7 @@ services:
 
   spectre-cli:
     container_name: spectre-cli
-    image: spectregrams/spectre-cli:5.2.1  # x-release-please-version
+    image: spectregrams/spectre-cli:5.2.2  # x-release-please-version
     environment:
       - SPECTRE_SERVER_HOST=${SPECTRE_SERVER_HOST}
       - SPECTRE_SERVER_PORT=${SPECTRE_SERVER_PORT}
