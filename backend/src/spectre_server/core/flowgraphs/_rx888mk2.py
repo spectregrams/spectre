@@ -27,6 +27,7 @@ class RX888MK2FixedCenterFrequencyModel(BaseModel):
     antenna_port: spectre_server.core.fields.Field.antenna_port = RX888MK2Port.HF
     if_gain: spectre_server.core.fields.Field.if_gain = 20
     rf_gain: spectre_server.core.fields.Field.rf_gain = 0
+    bias_tee: spectre_server.core.fields.Field.bias_tee = False
     batch_size: spectre_server.core.fields.Field.batch_size = 1
     buffers: spectre_server.core.fields.Field.buffers = 1024
     output_type: spectre_server.core.fields.Field.output_type = (
@@ -51,6 +52,9 @@ class RX888MK2FixedCenterFrequency(Base[RX888MK2FixedCenterFrequencyModel]):
         self.soapy_rx888mk2_source.set_antenna(0, model.antenna_port)
         self.soapy_rx888mk2_source.set_gain(0, "RF", model.rf_gain)
         self.soapy_rx888mk2_source.set_gain(0, "IF", model.if_gain)
+        self.soapy_rx888mk2_source.write_setting(
+            "UpdBiasT_HF", "true" if model.bias_tee else "false"
+        )
 
         self.spectre_batched_file_sink = spectre.batched_file_sink(
             self._batches_dir_path,
