@@ -119,3 +119,9 @@ def test_time_format_parsing(format: str, dt: str, expected_parsed: datetime.dat
     """Ensure that example datetimes parse correctly using the defined formats."""
     parsed = datetime.datetime.strptime(dt, format)
     assert parsed == expected_parsed
+
+
+def test_utc_now_is_naive():
+    """`utc_now` must return a timezone-naive datetime."""
+    now = spectre_server.core.config.utc_now()
+    assert now.tzinfo is None
