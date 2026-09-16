@@ -4,6 +4,7 @@
 
 import os
 import logging
+import time
 import typing
 
 import spectre_server.core.config
@@ -32,11 +33,12 @@ def configure_root_logger(
 
     file_handler = logging.FileHandler(file_path)
     file_handler.setLevel(level)
-    file_handler.setFormatter(
-        logging.Formatter(
-            "[%(asctime)s] [%(levelname)8s] --- %(message)s (%(name)s:%(lineno)s)"
-        )
+    formatter = logging.Formatter(
+        "[%(asctime)s] [%(levelname)8s] --- %(message)s (%(name)s:%(lineno)s)",
+        datefmt="%Y-%m-%dT%H:%M:%SZ",
     )
+    formatter.converter = time.gmtime
+    file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
     return os.path.abspath(file_path)

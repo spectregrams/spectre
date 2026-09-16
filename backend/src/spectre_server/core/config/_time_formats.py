@@ -26,5 +26,5 @@ class TimeFormat:
 
 
 def utc_now() -> datetime.datetime:
-    """Return the current UTC time with an explicit timezone."""
-    return datetime.datetime.now(datetime.timezone.utc)
+    """Return the current UTC time as a naive datetime."""
+    return datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)

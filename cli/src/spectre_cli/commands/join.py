@@ -42,12 +42,14 @@ def _is_on_minute(t: datetime.time, minute: int) -> bool:
 
 
 def _utc_combine(time: str, date: datetime.date) -> datetime.datetime:
+    """Combine a UTC ``date`` and ``time`` string into a naive-UTC datetime."""
     as_time = datetime.datetime.strptime(time, _UTC_TIME_FORMAT).time()
-    return datetime.datetime.combine(date, as_time, tzinfo=datetime.timezone.utc)
+    return datetime.datetime.combine(date, as_time)
 
 
 def _utc_now() -> datetime.datetime:
-    return datetime.datetime.now(datetime.timezone.utc)
+    """Return the current UTC wall-clock time as a naive datetime."""
+    return datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
 
 
 def _next_day(d: datetime.datetime) -> datetime.datetime:
@@ -61,8 +63,10 @@ def _validate_times(
     mod_minutes: int,
 ) -> None:
     """Check the start and end times make sense."""
-    if start_time.tzinfo is None or end_time.tzinfo is None:
-        typer.secho(f"Start and end times must be UTC.", fg="yellow")
+    if start_time.tzinfo is not None or end_time.tzinfo is not None:
+        typer.secho(
+            f"Start and end times must be naive (interpreted as UTC).", fg="yellow"
+        )
         raise typer.Exit(1)
 
     if start_time < now:
