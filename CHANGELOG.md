@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.2.3](https://github.com/spectregrams/spectre/compare/v5.2.2...v5.2.3) (2026-09-16)
+
+
+### Bug Fixes
+
+* issue-306 Consistently use (naive) UTC datetimes ([82ffef9](https://github.com/spectregrams/spectre/commit/82ffef9be88df8f52928cf426acc5ec601677ae0))
+
 ## [5.2.2](https://github.com/spectregrams/spectre/compare/v5.2.1...v5.2.2) (2026-09-10)
 
 
