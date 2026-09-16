@@ -187,7 +187,7 @@ def plot(
     ),
 ) -> None:
     if obs_date is None:
-        obs_date = datetime.date.today().strftime("%Y-%m-%d")
+        obs_date = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
 
     json = {
         "tags": tags,
