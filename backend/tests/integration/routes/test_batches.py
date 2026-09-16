@@ -7,6 +7,8 @@ import time
 
 import flask.testing
 
+import spectre_server.core.config
+
 TAG = "cw"
 
 
@@ -26,7 +28,7 @@ def test_plot_lifecycle(client: flask.testing.FlaskClient) -> None:
     assert jsend["status"] == "success", jsend
 
     # Capture the current time window for the plot request.
-    now = datetime.datetime.utcnow()
+    now = spectre_server.core.config.utc_now()
     obs_date = now.strftime("%Y-%m-%d")
     start_time = now.strftime("%H:%M:%S")
 
