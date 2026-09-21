@@ -342,6 +342,15 @@ class Field:
             description="If true, amplify the signal.",
         ),
     ]
+    # TODO: Update the description when bias tees are properly disabled on completed recordings.
+    bias_tee = typing.Annotated[
+        bool,
+        pydantic.Field(
+            ...,
+            validate_default=True,
+            description="[EXPERIMENTAL] If true, enable the bias tee on the selected antenna port. Warning - this setting persists after recordings!",
+        ),
+    ]
     lna_gain = typing.Annotated[
         float,
         pydantic.Field(
