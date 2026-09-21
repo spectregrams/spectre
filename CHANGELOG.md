@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.3.0](https://github.com/spectregrams/spectre/compare/v5.2.3...v5.3.0) (2026-09-21)
+
+
+### Features
+
+* issue-313 Optionally enable bias-tee ([4281ab0](https://github.com/spectregrams/spectre/commit/4281ab0f51ee577747949e31570830320ce6929d))
+
 ## [5.2.3](https://github.com/spectregrams/spectre/compare/v5.2.2...v5.2.3) (2026-09-16)
 
 
