@@ -4,7 +4,7 @@
 
 """Real-time, extensible post-processing of SDR data into spectrograms."""
 
-from ._base import Base
+from ._base import Base, ready_to_flush
 from ._fixed_center_frequency import FixedCenterFrequency, FixedCenterFrequencyModel
 from ._swept_center_frequency import SweptCenterFrequency, SweptCenterFrequencyModel
 from ._callisto import Callisto, CallistoModel
@@ -38,4 +38,5 @@ __all__ = [
     "get_num_spectrums",
     "get_num_dangling_samples",
     "get_cosine_signal",
+    "ready_to_flush",
 ]
