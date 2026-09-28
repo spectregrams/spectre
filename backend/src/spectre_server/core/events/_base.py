@@ -18,11 +18,25 @@ import spectre_server.core.fields
 _LOGGER = logging.getLogger(__name__)
 
 
+def ready_to_flush(
+    cached_time_range: float, batch_size: float, target_time_range: float
+) -> bool:
+    """Decide whether the cached spectrogram has covered the target duration.
+
+    :param cached_time_range: The current ``time_range`` of the cached spectrogram.
+    :param batch_size: The duration of one batch, in seconds.
+    :param target_time_range: The target duration of the written spectrogram, in seconds.
+    :return: True when adding another batch would overshoot the target.
+    """
+    return cached_time_range + batch_size > target_time_range
+
+
 class BaseModel(pydantic.BaseModel):
     model_config = pydantic.ConfigDict(
         validate_assignment=True,
     )
     time_range: spectre_server.core.fields.Field.time_range = 0
+    batch_size: spectre_server.core.fields.Field.batch_size = 3
     origin: spectre_server.core.fields.Field.origin = "NOTSET"
     telescop: spectre_server.core.fields.Field.telescop = "NOTSET"
     instrume: spectre_server.core.fields.Field.instrume = "NOTSET"
@@ -145,7 +159,11 @@ class Base(abc.ABC, typing.Generic[M, B], watchdog.events.FileSystemEventHandler
                 )
             )
 
-        if self.__cached_spectrogram.time_range >= self.__model.time_range:
+        if ready_to_flush(
+            self.__cached_spectrogram.time_range,
+            self.__model.batch_size,
+            self.__model.time_range,
+        ):
             self.__flush_cache()
 
     def __flush_cache(self) -> None:

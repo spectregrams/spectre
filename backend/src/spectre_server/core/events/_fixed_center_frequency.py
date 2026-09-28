@@ -36,7 +36,6 @@ class FixedCenterFrequencyModel(BaseModel):
     sample_rate: spectre_server.core.fields.Field.sample_rate = 32e3
     frequency_resolution: spectre_server.core.fields.Field.frequency_resolution = 0
     time_resolution: spectre_server.core.fields.Field.time_resolution = 0
-    batch_size: spectre_server.core.fields.Field.batch_size = 3
     keep_signal: spectre_server.core.fields.Field.keep_signal = True
     output_type: spectre_server.core.fields.Field.output_type = (
         spectre_server.core.fields.OutputType.FC32

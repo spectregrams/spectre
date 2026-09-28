@@ -113,7 +113,7 @@ class Field:
             ...,
             validate_default=True,
             ge=0,
-            description="The minimum target time range of the spectrogram, in seconds. 0 for minimum possible.",
+            description="Target time range of the spectrogram, in seconds. Set to 0 for a spectrogram per batch.",
         ),
     ]
     origin = typing.Annotated[

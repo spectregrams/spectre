@@ -307,3 +307,39 @@ class TestSTFFT:
         )
 
         assert is_close(dynamic_spectra, expected_dynamic_spectra)
+
+
+class TestReadyToFlush:
+    @pytest.mark.parametrize(
+        ("cached_time_range", "batch_size", "target_time_range", "expected"),
+        [
+            # Cache is well below the target - don't yet flush.
+            (0.0, 3.0, 900.0, False),
+            (500.0, 3.0, 900.0, False),
+            # Exactly one more batch meets the target - don't yet flush.
+            (897.0, 3.0, 900.0, False),
+            # Exactly one more batch _just_ exceeds the target - flush.
+            (897.001, 3.0, 900.0, True),
+            # Cached range meets the target - flush.
+            (900.0, 3.0, 900.0, True),
+            # Cached range exceeds the target - flush. Cannot occur, but make sure the behaviour is explicit
+            (1500.0, 3.0, 900.0, True),
+            # Zero target flushes every batch.
+            (0.0, 3.0, 0.0, True),
+            (0.0, 1.0, 0.0, True),
+        ],
+    )
+    def test_ready_to_flush(
+        self,
+        cached_time_range: float,
+        batch_size: float,
+        target_time_range: float,
+        expected: bool,
+    ) -> None:
+        """Check the conditions when we flush spectrograms to disk."""
+        assert (
+            spectre_server.core.events.ready_to_flush(
+                cached_time_range, batch_size, target_time_range
+            )
+            is expected
+        )
