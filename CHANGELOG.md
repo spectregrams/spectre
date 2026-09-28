@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.3.1](https://github.com/spectregrams/spectre/compare/v5.3.0...v5.3.1) (2026-09-28)
+
+
+### Bug Fixes
+
+* issue-322 Prevent spectrogram timestamp drift ([35b7a18](https://github.com/spectregrams/spectre/commit/35b7a18c9c46376e59e537947aa36f77169e54f5))
+
 ## [5.3.0](https://github.com/spectregrams/spectre/compare/v5.2.3...v5.3.0) (2026-09-21)
 
 
