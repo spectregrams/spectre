@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.4.0](https://github.com/spectregrams/spectre/compare/v5.3.1...v5.4.0) (2026-10-02)
+
+
+### Features
+
+* issue-305 Upload files to Astrodoncel ([58ceea8](https://github.com/spectregrams/spectre/commit/58ceea81f10dcc4e15773cb07ecc90d7ee7c28d5))
+
 ## [5.3.1](https://github.com/spectregrams/spectre/compare/v5.3.0...v5.3.1) (2026-09-28)
 
 
