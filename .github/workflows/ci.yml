@@ -62,7 +62,9 @@ jobs:
       - name: Check formatting
         run: docker run --rm -w /app/ci/cli spectre-dev-cli:ci black --check .
       - name: Check types
-        run: docker run --rm -w /app/ci/cli spectre-dev-cli:ci mypy src
+        run: docker run --rm -w /app/ci/cli spectre-dev-cli:ci mypy src tests
+      - name: Run unit tests
+        run: docker run --rm -w /app/ci/cli spectre-dev-cli:ci pytest tests/unit -q
 
   commitlint:
     runs-on: ubuntu-latest
