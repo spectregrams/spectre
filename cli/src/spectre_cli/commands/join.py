@@ -7,9 +7,6 @@ import typing
 import time
 import dataclasses
 import tempfile
-import ftplib
-import os
-import os.path
 
 import typer
 
@@ -25,7 +22,13 @@ from ._secho_resources import (
     secho_existing_resource,
 )
 from .get import download_callisto_resources
-from ..config import ECALLISTO_USERNAME, ECALLISTO_PASSWORD
+import spectre_cli.uploaders
+from ..config import (
+    FHNW_USERNAME,
+    FHNW_PASSWORD,
+    ASTRODONCEL_USERNAME,
+    ASTRODONCEL_PASSWORD,
+)
 
 join_typer = typer.Typer(help="Join a network as a node.")
 
@@ -37,11 +40,11 @@ _TIME_RANGE_MINUTES = 15
 _UPLOAD_OFFSET_MINUTES = 1
 
 
-def _is_on_minute(t: datetime.time, minute: int) -> bool:
+def is_on_minute(t: datetime.time, minute: int) -> bool:
     return t.minute % minute == 0 and t.second == 0
 
 
-def _utc_combine(time: str, date: datetime.date) -> datetime.datetime:
+def utc_combine(time: str, date: datetime.date) -> datetime.datetime:
     """Combine a UTC ``date`` and ``time`` string into a naive-UTC datetime."""
     as_time = datetime.datetime.strptime(time, _UTC_TIME_FORMAT).time()
     return datetime.datetime.combine(date, as_time)
@@ -52,7 +55,7 @@ def _utc_now() -> datetime.datetime:
     return datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
 
 
-def _next_day(d: datetime.datetime) -> datetime.datetime:
+def next_day(d: datetime.datetime) -> datetime.datetime:
     return d + datetime.timedelta(days=1)
 
 
@@ -80,7 +83,7 @@ def _validate_times(
         typer.secho(f"End time must be more than start time.")
         raise typer.Exit(1)
 
-    if not _is_on_minute(start_time.time(), mod_minutes) or not _is_on_minute(
+    if not is_on_minute(start_time.time(), mod_minutes) or not is_on_minute(
         end_time.time(), mod_minutes
     ):
         typer.secho(
@@ -149,26 +152,26 @@ def _expected_filename(tag: str, when: datetime.datetime) -> str:
 
 
 @dataclasses.dataclass(frozen=True)
-class _Upload:
-    """At ``when`` export ``filename`` and upload it to the FTP server."""
+class Upload:
+    """At ``when`` export ``filename`` and upload it to the e-Callisto servers."""
 
     when: datetime.datetime
     filename: str
 
 
-def _make_upload_schedule(
+def make_upload_schedule(
     tag,
     start: datetime.datetime,
     end: datetime.datetime,
     time_range_minutes: int,
     upload_offset_minutes: int,
-) -> list[_Upload]:
+) -> list[Upload]:
     """Upload each spectrograms some offset after they were written to disk."""
-    schedule: list[_Upload] = []
+    schedule: list[Upload] = []
     t = start + datetime.timedelta(minutes=time_range_minutes)
     while t <= end:
         schedule.append(
-            _Upload(
+            Upload(
                 t + datetime.timedelta(minutes=upload_offset_minutes),
                 _expected_filename(
                     tag, t - datetime.timedelta(minutes=time_range_minutes)
@@ -221,35 +224,13 @@ def _find_file(date: datetime.date, basename: str) -> typing.Optional[str]:
     return None
 
 
-def _upload_credentials() -> tuple[str, str]:
-    if ECALLISTO_PASSWORD is None or ECALLISTO_USERNAME is None:
-        typer.secho("e-Callisto upload credentials are missing", fg="yellow")
+def _require_credentials(
+    server: str, username: typing.Optional[str], password: typing.Optional[str]
+) -> tuple[str, str]:
+    if username is None or password is None:
+        typer.secho(f"{server} upload credentials are missing", fg="yellow")
         raise typer.Exit(1)
-    return ECALLISTO_USERNAME, ECALLISTO_PASSWORD
-
-
-def _upload_to_fhnw(
-    file_path: str,
-    host: str,
-    port: int,
-    username: str,
-    password: str,
-) -> None:
-    """Upload the spectrogram at ``file_path`` to the FHNW FTP server."""
-
-    # Log in to (and configure) the FTP server.
-    with ftplib.FTP(timeout=10) as ftp:
-        ftp.connect(host, port)
-        ftp.login(username, password)
-        ftp.set_pasv(True)
-
-        # Upload the file (as per the legacy script).
-        with open(file_path, "rb") as f:
-            basename = os.path.basename(file_path)
-            tmpname = basename + ".tmp"
-            ftp.storbinary("STOR " + tmpname, f)
-            time.sleep(1)
-            ftp.rename(tmpname, basename)
+    return username, password
 
 
 @join_typer.command(help="Join the e-Callisto network.")
@@ -272,35 +253,64 @@ def ecallisto(
         "--end-next-day",
         help="If provided, the end time is interpreted as on the next UTC day.",
     ),
-    host: str = typer.Option(
+    fhnw_host: str = typer.Option(
         "127.0.0.1",
-        "--host",
-        help="FTP server host.",
+        "--fhnw-host",
+        help="FHNW FTP server host.",
     ),
-    port: int = typer.Option(
+    fhnw_port: int = typer.Option(
         2121,
-        "--port",
-        help="FTP server port.",
+        "--fhnw-port",
+        help="FHNW FTP server port.",
+    ),
+    astrodoncel_host: str = typer.Option(
+        "127.0.0.1",
+        "--astrodoncel-host",
+        help="Astrodoncel SFTP server host.",
+    ),
+    astrodoncel_port: int = typer.Option(
+        2222,
+        "--astrodoncel-port",
+        help="Astrodoncel SFTP server port.",
     ),
 ) -> None:
 
     # Parse and validate the start and end dates.
     now = _utc_now()
     start_date = now.date()
-    start = _utc_combine(start_time, start_date)
-    end_date = start_date if not end_next_day else _next_day(now).date()
-    end = _utc_combine(end_time, end_date)
+    start = utc_combine(start_time, start_date)
+    end_date = start_date if not end_next_day else next_day(now).date()
+    end = utc_combine(end_time, end_date)
     _validate_times(start, end, now, _TIME_RANGE_MINUTES)
 
     # Make sure the config is compatible with e-Callisto.
     expected_time_range = _TIME_RANGE_MINUTES * 60
     _validate_config(tag, _REQUIRED_MODE, expected_time_range)
 
+    # Fail fast if either server's credentials are missing.
+    fhnw_username, fhnw_password = _require_credentials(
+        "FHNW", FHNW_USERNAME, FHNW_PASSWORD
+    )
+    astrodoncel_username, astrodoncel_password = _require_credentials(
+        "Astrodoncel", ASTRODONCEL_USERNAME, ASTRODONCEL_PASSWORD
+    )
+    uploaders: list[spectre_cli.uploaders.Uploader] = [
+        spectre_cli.uploaders.FhnwUploader(
+            fhnw_host, fhnw_port, fhnw_username, fhnw_password
+        ),
+        spectre_cli.uploaders.AstrodoncelUploader(
+            astrodoncel_host,
+            astrodoncel_port,
+            astrodoncel_username,
+            astrodoncel_password,
+        ),
+    ]
+
     # Repeat indefinitely, until a keyboard interrupt.
     while True:
 
         # Ahead of starting the recording, make the upload schedule.
-        schedule = _make_upload_schedule(
+        schedule = make_upload_schedule(
             tag, start, end, _TIME_RANGE_MINUTES, _UPLOAD_OFFSET_MINUTES
         )
 
@@ -331,8 +341,17 @@ def ecallisto(
                     file_paths = download_callisto_resources(
                         [endpoint], tmpdir, compress=True
                     )
-                    _upload_to_fhnw(file_paths[0], host, port, *_upload_credentials())
-                    secho_new_resource(f"[uploaded] {upload.filename}")
+                    for uploader in uploaders:
+                        try:
+                            uploader.upload(file_paths[0])
+                        except spectre_cli.uploaders.UploadError as e:
+                            secho_stale_resource(
+                                f"[failed: {uploader.name}] {upload.filename}: {e}"
+                            )
+                        else:
+                            secho_new_resource(
+                                f"[uploaded: {uploader.name}] {upload.filename}"
+                            )
             finally:
                 # Make sure we don't unwittingly leave the recording running on error.
                 typer.secho("Stopping...")
@@ -340,4 +359,4 @@ def ecallisto(
                 secho_stale_resource(recording_endpoint)
 
             # Repeat the next day.
-            start, end = _next_day(start), _next_day(end)
+            start, end = next_day(start), next_day(end)
